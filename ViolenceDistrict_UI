@@ -1816,17 +1816,37 @@ local function GetItemIcon(itemName)
 end
 
 local function ResolveKillerType(player)
-    if not player then return "The Killer" end
+    if not player then return "Killer" end
     local char = player.Character
     if char then
+        local morph = tostring(char:GetAttribute("MorphedKiller") or ""):lower()
+        if morph ~= "" and morph ~= "nil" and morph ~= "none" then
+            local map = {
+                cure = "Cure", veil = "Veil", masked = "Masked", stalker = "Stalker",
+                killer = "Killer", hidden = "Hidden", abysswalker = "Abysswalker", slasher = "Slasher",
+                butcher = "Butcher"
+            }
+            if map[morph] then return map[morph] end
+            for k, v in pairs(map) do
+                if morph:find(k, 1, true) then return v end
+            end
+        end
         if char:FindFirstChild("Flask") or char:FindFirstChild("Curetool") or char:GetAttribute("corpsecharge") then
             return "Cure"
         elseif char:FindFirstChild("spearmanager") or char:FindFirstChild("Spear1") or char:FindFirstChild("Spear2") or char:GetAttribute("Spears") or char:GetAttribute("spearmode") then
             return "Veil"
         elseif char:GetAttribute("StalkerStage2Remaining") ~= nil or char:GetAttribute("Stage") ~= nil or char:GetAttribute("StalkStage") ~= nil or char:FindFirstChild("Chainsaw") or char:FindFirstChild("Stalker") then
             return "Stalker"
-        elseif char:FindFirstChild("Katana") or char:FindFirstChild("Sword") then
+        elseif char:FindFirstChild("Katana") or char:FindFirstChild("Sword") or char:FindFirstChild("pamela") or char:GetAttribute("Pursuit") ~= nil or char:GetAttribute("LakeMist") ~= nil then
             return "Slasher"
+        elseif char:FindFirstChild("Beartrap") or char:FindFirstChild("BearTrap") or char:GetAttribute("Butcher") == true or char:GetAttribute("PlacingTrap") ~= nil or char:GetAttribute("ChainThrows") ~= nil or char:GetAttribute("Beartraps") ~= nil then
+            return "Butcher"
+        elseif char:FindFirstChild("Abysswalker") or char:FindFirstChild("Wave") then
+            return "Abysswalker"
+        elseif char:FindFirstChild("Knide") or char:FindFirstChild("Knife") or char:GetAttribute("preparem2") then
+            return "Hidden"
+        elseif char:GetAttribute("Mask") or char:GetAttribute("MaskExpired") or char:GetAttribute("Masked") == true then
+            return "Masked"
         end
     end
     local kAttr = player:GetAttribute("SelectedKiller") or (char and char:GetAttribute("SelectedKiller"))
@@ -1841,7 +1861,7 @@ local function ResolveKillerType(player)
         if map[clean] then return map[clean] end
         return kAttr
     end
-    return "The Killer"
+    return "Killer"
 end
 
 local function GetKillerPortrait(kName)
@@ -1874,6 +1894,19 @@ local function SetupKillerAvatar(row, kName, plr)
     local avatarImg = row.AvatarImg
     local avatarText = row.AvatarText
 
+    -- Streamer mode check for local player
+    if plr == LocalPlayer and Config.StreamerMode then
+        if row._renderedVpf then
+            pcall(function() row._renderedVpf:Destroy() end)
+            row._renderedVpf = nil
+        end
+        avatarImg.Image = "rbxassetid://104764121703058"
+        avatarImg.ScaleType = Enum.ScaleType.Fit
+        avatarImg.Visible = true
+        avatarText.Visible = false
+        return
+    end
+
     if row._renderedKiller == kName and row._renderedVpf and row._renderedVpf.Parent == avatarBox then
         avatarImg.Visible = false
         avatarText.Visible = false
@@ -1888,7 +1921,7 @@ local function SetupKillerAvatar(row, kName, plr)
     local oldVpf = avatarBox:FindFirstChild("KillerViewport")
     if oldVpf then pcall(function() oldVpf:Destroy() end) end
 
-    local clean = tostring(kName or "Veil"):lower():gsub("%s+", ""):gsub("[^%a]", "")
+    local clean = tostring(kName or "Killer"):lower():gsub("%s+", ""):gsub("[^%a]", "")
     if clean:sub(1, 3) == "the" and #clean > 3 then clean = clean:sub(4) end
 
     local rs = game:GetService("ReplicatedStorage")
@@ -1900,6 +1933,9 @@ local function SetupKillerAvatar(row, kName, plr)
                 kFolder = kf
                 break
             end
+        end
+        if not kFolder then
+            kFolder = rs.Killers:FindFirstChild("Killer") or rs.Killers:FindFirstChild("Butcher")
         end
     end
 
@@ -1984,8 +2020,8 @@ local function SetupKillerAvatar(row, kName, plr)
         avatarImg.ScaleType = Enum.ScaleType.Fit
         avatarImg.Visible = true
         avatarText.Visible = false
-    elseif plr and plr.UserId then
-        avatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. plr.UserId .. "&w=150&h=150"
+    else
+        avatarImg.Image = KillerPortraits["butcher"] or KillerPortraits["killer"] or "rbxassetid://106695569058121"
         avatarImg.ScaleType = Enum.ScaleType.Fit
         avatarImg.Visible = true
         avatarText.Visible = false
@@ -2689,7 +2725,7 @@ local function GetResolvedKillerLevel(plr, kType)
         return attrLvl
     end
 
-    if plr == LocalPlayer then
+    if plr == LocalPlayer and IsInLobby() then
         local now = os.clock()
         if not LocalKillerLevelCache[cleanK] or (now - (LastKillerLevelQuery[cleanK] or 0) > 15) then
             LastKillerLevelQuery[cleanK] = now
@@ -2777,6 +2813,22 @@ local function UpdateRoster(force)
         local platUpper = rawPlat:upper()
         local platDisplay = (platUpper == "MOBILE" and "MOBILE") or (platUpper == "CONSOLE" and "CONSOLE") or "PC"
 
+        -- Streamer Mode Name and Avatar
+        if plr == LocalPlayer and Config.StreamerMode then
+            row.NameLabel.Text = "★ NexaraScript"
+            row.UserLabel.Text = "@NexaraScript"
+            if row._renderedVpf then
+                pcall(function() row._renderedVpf:Destroy() end)
+                row._renderedVpf = nil
+            end
+            row.AvatarImg.Image = "rbxassetid://104764121703058"
+            row.AvatarImg.Visible = true
+            row.AvatarText.Visible = false
+        else
+            row.NameLabel.Text = (plr == LocalPlayer and "★ " or "") .. plr.DisplayName
+            row.UserLabel.Text = "@" .. plr.Name
+        end
+
         if isK then
             local kCol = Color3.fromRGB(255, 60, 80)
             row.AccentBar.BackgroundColor3 = kCol
@@ -2820,7 +2872,9 @@ local function UpdateRoster(force)
                 row._renderedVpf = nil
             end
             row._renderedKiller = nil
-            row.AvatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. plr.UserId .. "&w=150&h=150"
+            if not (plr == LocalPlayer and Config.StreamerMode) then
+                row.AvatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. plr.UserId .. "&w=150&h=150"
+            end
             row.AvatarImg.Visible = true
             row.AvatarText.Visible = false
 
@@ -3511,6 +3565,12 @@ pcall(function()
         trigger.MouseButton1Click:Connect(function()
             Config.StreamerMode = not Config.StreamerMode
             updateStreamerToggleVisual(Config.StreamerMode)
+            if WelcomeName and WelcomeName.Parent then
+                WelcomeName.Text = (Config.StreamerMode and "NexaraScript") or LocalPlayer.DisplayName
+            end
+            if WelcomeTag and WelcomeTag.Parent then
+                WelcomeTag.Text = (Config.StreamerMode and "@NexaraScript") or ("@" .. LocalPlayer.Name)
+            end
             if ctx.SetStreamerMode then
                 ctx.SetStreamerMode(Config.StreamerMode)
             elseif _G.Nexara_SetStreamerMode then
@@ -3518,6 +3578,9 @@ pcall(function()
             end
             Window.ConfigValues["Streamer Mode"] = Config.StreamerMode
             if Window.OnSilentAutoSave then Window.OnSilentAutoSave() end
+            task.spawn(function()
+                pcall(function() UpdateRoster(true) end)
+            end)
         end)
 
         toggleRow.Parent = elems
