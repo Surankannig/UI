@@ -2730,19 +2730,18 @@ local function GetResolvedKillerLevel(plr, kType)
 end
 
 local function UpdateRoster(force)
+    local inLobby = IsInLobby()
     local allPlayers = Players:GetPlayers()
     local killerPlr = nil
     local survivors = {}
 
     for _, p in ipairs(allPlayers) do
-        if not killerPlr and IsKiller(p) then
+        if not inLobby and not killerPlr and IsKiller(p) then
             killerPlr = p
         else
             table.insert(survivors, p)
         end
     end
-
-    local inLobby = IsInLobby()
     RosterTitle.Text = "Match Info Beta"
 
     for p, row in pairs(cachedRosterRows) do
